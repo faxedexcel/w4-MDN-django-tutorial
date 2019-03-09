@@ -53,5 +53,6 @@ class AuthorListView(generic.ListView):
 
 class AuthorDetailView(generic.DetailView):
     model = Author
+    num_instances_available = BookInstance.objects.filter(status__exact='a').count()
 
  
