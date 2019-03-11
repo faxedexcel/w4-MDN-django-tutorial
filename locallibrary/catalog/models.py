@@ -3,6 +3,9 @@ from django.urls import reverse
     # Used to generate URLs by reversing the URL patterns
 import uuid
     # Required for unique book instances
+from django.contrib.auth.models import User
+    # Required to make use of 'User' class
+from datetime import date
 
 # Create your models here.
 
@@ -53,6 +56,11 @@ class BookInstance(models.Model):
     book = models.ForeignKey('Book', on_delete=models.SET_NULL, null=True)
     imprint = models.CharField(max_length=200)
     due_back = models.DateField(null=True, blank=True)
+    borrower = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+        # Foreign Key used b/c book instance can only have 1 borrower, but borrower can have many book instances
+        # 'User' model class argument is declared to connect the relationship between the 'BookInstance' and 'User' classes
+        # 'on_delete=models.SET_NULL' argument sets the value of the borrower to Null if the associated borrower record is deleted
+        # 'null=True' argument allows the database to store a 'Null' value if no borrower is selected
 
     LOAN_STATUS = (
         ('m', 'Maintenance'),
@@ -71,7 +79,16 @@ class BookInstance(models.Model):
 
     class Meta:
         ordering = ['due_back']
+        permissions = (("can_mark_returned", "Set book as returned"),)
+            # You can specify as many permissions as you need in a tuple, each permission itself being defined in a nested tuple containing the permission name and permission display value
+            # Allows a user to mark that a book has been returned
 
+    @property
+    def is_overdue(self):
+        if self.due_back and date.today() > self.due_back:
+            return True
+        return False
+    
     def __str__(self):
         """String for representing the Model object."""
         return f'{self.id} ({self.book.title})' 

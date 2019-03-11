@@ -1,0 +1,21 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+  <h1>Renew: {{ book_instance.book.title }}</h1>
+  <p>Borrower: {{ book_instance.borrower }}</p>
+  <p{% if book_instance.is_overdue %} class="text-danger"{% endif %}>Due date: {{ book_instance.due_back }}</p>
+    
+  <form action="" method="post">
+      <!--'action=""' means that the form data will be posted back to the current URL of the page-->
+      <!--'method="post"' data will be submitted as a HTTP POST-->
+    {% csrf_token %}
+        <!--part of Django's cross-site forgery protection...this should be added to every Django template that uses POST to submit data-->
+    <table>
+    {{ form.as_table }}
+        <!--provides the default rendering of all the form fields, including their labels, widgets, and help text-->
+        <!--each field is rendered as a table row-->
+    </table>
+    <input type="submit" value="Submit">
+        <!--user can press to submit the data-->
+  </form>
+{% endblock %}

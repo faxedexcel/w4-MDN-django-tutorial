@@ -1,6 +1,16 @@
-from django.shortcuts import render
+import datetime
+from django.shortcuts import render, get_object_or_404
+    # 'get_object_or_404()' returns a specified object from a model based on its primary key value and raises an 'Http404' exception (not found), if the record does not exist
 from catalog.models import Book, Author, BookInstance, Genre
 from django.views import generic
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.decorators import permission_required
+from django.http import HttpResponseRedirect
+    # 'HttpResponseRedirect' creates a redirect to a specified URL (HTTP status code 302)
+from django.urls import reverse
+    # 'reverse()' generates a URL from a URL configuration name and a set of arguments...it is the Python equivalent of the 'url' tag used in templates
+from catalog.forms import RenewBookForm
+    # imports the 'RenewBookForm' class from forms.py
 
 # Create your views here.
 
@@ -63,4 +73,62 @@ class AuthorDetailView(generic.DetailView):
     model = Author
     num_instances_available = BookInstance.objects.filter(status__exact='a').count()
 
- 
+class LoanedBooksByUserListView(LoginRequiredMixin,generic.ListView):
+    """Generic class-based view listing books on loan to current user."""
+    model = BookInstance
+    template_name ='catalog/bookinstance_list_borrowed_user.html'
+        # 'template_name' declared, rather than useing the default, b/c we may end up having a few different lists of BookInstance records, with different views and templates
+    paginate_by = 10
+    
+    def get_queryset(self):
+        return BookInstance.objects.filter(borrower=self.request.user).filter(status__exact='o').order_by('due_back')
+        # 'get_queryset()' re-implemented to restrict our query to just the 'BookInstance' objects for the current user
+        # Note: that 'o' is the stored code for "on loan" and we order by the 'due_back' date so that the oldest items are displayed first
+
+class AllLoanedBooksListView(PermissionRequiredMixin,generic.ListView):
+    """Generic class-based view listing all books on loan to librarian user."""
+    permission_required = 'catalog.can_mark_returned'
+        # permission-required mixin required for class-based views instead of function view decorator
+        # restricts access to the view to librarian
+    model = BookInstance
+    template_name ='catalog/bookinstance_list_borrowed_librarian.html'
+        # 'template_name' declared, rather than useing the default, b/c we may end up having a few different lists of BookInstance records, with different views and templates
+    paginate_by = 10
+    
+    def get_queryset(self):
+        return BookInstance.objects.filter(status__exact='o').order_by('due_back')
+        # Note: that 'o' is the stored code for "on loan" and we order by the 'due_back' date so that the oldest items are displayed first
+
+@permission_required('catalog.can_mark_returned') # restricts access to the view to librarians
+def renew_book_librarian(request, pk):
+    """View function for renewing a specific BookInstance by librarian."""
+    book_instance = get_object_or_404(BookInstance, pk=pk)
+
+    # If this is a POST request then process the Form data
+    if request.method == 'POST':
+
+        # Create a form instance and populate it with data from the request (binding):
+        form = RenewBookForm(request.POST)
+            # 'binding' is the process of creating a 'form' object and populating it with data from the request
+
+        # Check if the form is valid:
+        if form.is_valid():
+            # process the data in form.cleaned_data as required (here we just write it to the model due_back field)
+            book_instance.due_back = form.cleaned_data['renewal_date']
+            book_instance.save()
+
+            # redirect to a new URL:
+            return HttpResponseRedirect(reverse('/'))
+                # 'all-borrowed' view was not created, so we'll redirect to the home page at URL '/'
+
+    # if this is a GET (or any other method) create the default form.
+    else:
+        proposed_renewal_date = datetime.date.today() + datetime.timedelta(weeks=3)
+        form = RenewBookForm(initial={'renewal_date': proposed_renewal_date})
+
+    context = {
+        'form': form,
+        'book_instance': book_instance,
+    }
+
+    return render(request, 'catalog/book_renew_librarian.html', context)
