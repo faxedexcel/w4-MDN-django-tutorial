@@ -7,10 +7,12 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.contrib.auth.decorators import permission_required
 from django.http import HttpResponseRedirect
     # 'HttpResponseRedirect' creates a redirect to a specified URL (HTTP status code 302)
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
     # 'reverse()' generates a URL from a URL configuration name and a set of arguments...it is the Python equivalent of the 'url' tag used in templates
 from catalog.forms import RenewBookForm
     # imports the 'RenewBookForm' class from forms.py
+from django.views.generic.edit import CreateView, UpdateView, DeleteView
+    # Django generic editing views
 
 # Create your views here.
 
@@ -72,6 +74,36 @@ class AuthorListView(generic.ListView):
 class AuthorDetailView(generic.DetailView):
     model = Author
     num_instances_available = BookInstance.objects.filter(status__exact='a').count()
+
+class AuthorCreate(PermissionRequiredMixin, CreateView):
+    permission_required = 'catalog.can_mark_returned'
+        # permission-required mixin required for class-based views instead of function view decorator
+        # restricts access to the view to librarian
+    model = Author
+    fields = '__all__'
+        # specify the fields to display in the form, in this case: all fields
+    # initial = {'date_of_death': '05/01/2018'}
+        # specify initial values for each of the fields using a dictionary of {field_name/value} pairs
+    # 'CreateView' and 'UpdateView' use the same template by default and expects it to be named '<model name>_form.html'...in this case: 'author_form.html'
+
+class AuthorUpdate(PermissionRequiredMixin, UpdateView):
+    permission_required = 'catalog.can_mark_returned'
+        # permission-required mixin required for class-based views instead of function view decorator
+        # restricts access to the view to librarian
+    model = Author
+    fields = ['first_name', 'last_name', 'date_of_birth', 'date_of_death']
+        # specify the fields to display in the form, in this case: listed individually  
+    # expects a template to be named: 'author_form.html'   
+
+class AuthorDelete(PermissionRequiredMixin, DeleteView):
+    permission_required = 'catalog.can_mark_returned'
+        # permission-required mixin required for class-based views instead of function view decorator
+        # restricts access to the view to librarian
+    model = Author
+    success_url = reverse_lazy('authors')
+        # 'reverse_lazy()' function redirects to the author list after an author has been deleted
+        # ...is a lazily executed version of 'reverse()', b/c we're providing a URL to a class-based view attribute
+    # 'DeleteView' expects a template to be named '<model name>_confirm_delete.html'...in this case: 'author_confirm_delete.html'
 
 class LoanedBooksByUserListView(LoginRequiredMixin,generic.ListView):
     """Generic class-based view listing books on loan to current user."""
